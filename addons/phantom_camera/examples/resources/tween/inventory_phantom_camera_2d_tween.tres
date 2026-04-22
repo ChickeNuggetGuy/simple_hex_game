@@ -1,9 +1,3 @@
-[gd_resource type="Resource" script_class="PhantomCameraTween" load_steps=2 format=3 uid="uid://cllveybboaqk5"]
-
-[ext_resource type="Script" uid="uid://8umksf8e80fw" path="res://addons/phantom_camera/scripts/resources/tween_resource.gd" id="1_7yoy0"]
-
-[resource]
-script = ExtResource("1_7yoy0")
-duration = 0.6
-transition = 5
-ease = 1
+version https://git-lfs.github.com/spec/v1
+oid sha256:fc7e319032f89f2f450a78c0fbc1cb8a6d1b8a65cf2c3a3aab41293805b77323
+size 334

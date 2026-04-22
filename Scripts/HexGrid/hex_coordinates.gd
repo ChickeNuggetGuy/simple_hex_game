@@ -24,6 +24,7 @@ var _z : int
 func _init(x_value : int, z_value : int) -> void:
 	_x = x_value
 	_z = z_value
+	_y = -_x - _z
 
 
 func DistanceTo (other : HexCoordinates) -> int:

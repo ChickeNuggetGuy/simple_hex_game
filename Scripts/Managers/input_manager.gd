@@ -8,13 +8,12 @@ const RAY_LENGTH = 1000.0
 
 @export var unit_speed : int = 24 
 
-var _selected_unit: Unit = null
 var selected_cell : HexCell
 var from_cell : HexCell
 
 var shift_pressed : bool = false
 
-signal selected_unit_changed(selected_unit : Unit)
+
 
 func get_manager_name() -> String: return "InputManager"
 
@@ -45,53 +44,73 @@ func _input(event):
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			_handle_right_click(result, hex_grid)
 
+
 func _handle_left_click(result: Dictionary, hex_grid: HexGrid):
-	# If we hit a Unit (or a HexObject that is a Unit)
-	if not result.is_empty() and result.collider is Unit:
-		set_selected_unit(result.collider)
-		var start_cell = hex_grid.get_cell_from_position(_selected_unit.global_position)
+	var unit_manager : UnitManager = GameManager.get_manager("UnitManager")
+	var team_manager : TeamManager = GameManager.get_manager("TeamManager")
+	var action_manager : UnitActionManager = GameManager.get_manager("UnitActionManager")
+	
+	if result.is_empty(): return
+
+	# 1. Handle clicking on a UNIT
+	if result.collider is Unit:
+		var unit : Unit = result.collider
+		if unit_manager and team_manager:
+			if unit.team_afliliation == team_manager.player_team:
+				unit_manager.set_selected_unit(unit)
+		return
+
+	# 2. Handle clicking on a CELL
+	var cell : HexCell = hex_grid.get_cell_from_position(result.position)
+	if cell:
+		selected_cell = cell # Update the stored selected cell
 		
-		# Optional: Highlight the movement range immediately upon selection
-		hex_grid.search(start_cell, null, _selected_unit.unit_data.move_speed)
-		
-		
-	else:
-		# Clicked empty space or non-unit: Deselect
-		set_selected_unit(null)
-		# Clear highlights
-		for cell in hex_grid.cells:
-			cell.disable_highlight()
+		# CHECK FOR ACTION EXECUTION IMMEDIATELY
+		if unit_manager and action_manager:
+			var selected_unit = unit_manager.get_selected_unit()
+			var selected_action = action_manager.selected_action
+			
+			if selected_unit and selected_action:
+				# If we have a unit and an action ready, execute it on this cell NOW
+				action_manager.execute_action(selected_unit, cell, selected_action)
+			else:
+				# Otherwise, just highlight the cell as usual
+				for c in hex_grid.cells:
+					c.disable_highlight()
+				set_selected_cell(hex_grid, cell)
+
 
 func _handle_right_click(result: Dictionary, hex_grid: HexGrid):
+	var unit_manager : UnitManager = GameManager.get_manager("UnitManager")
 	var team_manager : TeamManager = GameManager.get_manager("TeamManager")
 	if not team_manager:
 		push_error("team manager not found!")
 		return
-	if _selected_unit == null:
+	if unit_manager and unit_manager.get_selected_unit() == null:
 		print("No unit selected to find a path for.")
 		return
 	
-	if _selected_unit.team_afliliation != team_manager.player_team:
-		print("No player unit selected to find a path for." + str(_selected_unit.team_afliliation )
+	if unit_manager and unit_manager.get_selected_unit().team_afliliation != team_manager.player_team:
+		print("No player unit selected to find a path for." + str(unit_manager.get_selected_unit().team_afliliation )
 		+ str( team_manager.player_team))
 		return	
 
 	if not result.is_empty():
 		var target_cell := hex_grid.get_cell_from_position(result.position)
-		var start_cell := _selected_unit.hex_cell
+		var start_cell := unit_manager.get_selected_unit().hex_cell
 		
 		if target_cell and start_cell:
 			hex_grid.find_path(
 				start_cell, 
 				target_cell, 
-				_selected_unit.unit_data.move_speed
+				unit_manager.get_selected_unit().unit_data.move_speed
 			)
 			
 			# Update UI
 			coordinates_label.text = "Target: %d, %d\nTurns: %d" % [
 				target_cell.coordinates.x, 
 				target_cell.coordinates.z,
-				(target_cell.distance / _selected_unit.unit_data.move_speed) + 1
+				(target_cell.distance / unit_manager.get_selected_unit().unit_data.move_speed) + 1
 			]
 			coordinates_label.global_position = target_cell.world_position
 
@@ -110,8 +129,7 @@ func _perform_raycast(mouse_pos: Vector2) -> Dictionary:
 	return space_state.intersect_ray(query)
 
 
-func set_selected_unit(unit : Unit):
-	if unit:
-		print("Selected unit: ", unit.unit_data.object_name)
-	_selected_unit = unit
-	selected_unit_changed.emit(_selected_unit)
+func set_selected_cell(hex_grid : HexGrid,value : HexCell):
+	selected_cell = value
+	if selected_cell:
+		selected_cell.enable_highlight(hex_grid, Color.WHITE)

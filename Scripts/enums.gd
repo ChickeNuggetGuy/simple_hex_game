@@ -9,6 +9,7 @@ static func opposite (direction :  HexDirection ) -> HexDirection:
 	return (direction + 3) if direction < 3  else (direction - 3);
 
 
+enum StatType {Health, Stamina, Mana}
 
 
 enum HexEdgeType {

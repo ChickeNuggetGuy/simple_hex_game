@@ -25,3 +25,10 @@ func add_unit(unit : Unit):
 	unit.team_afliliation = team_number
 	_active_units.append(unit)
 	add_child(unit)
+
+func remove_unit(unit: Unit):
+	if not _active_units.has(unit):
+		return
+	
+	_active_units.erase(unit)
+	unit.queue_free()

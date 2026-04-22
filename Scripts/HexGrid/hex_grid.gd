@@ -16,6 +16,8 @@ var cells: Array[HexCell] = []
 var chunks: Array[HexGridChunk] = []
 var ground_body: StaticBody3D
 
+var highlighted_cells : Array[HexCell] = []
+
 const _VARIANT_SUFFIXES: Array[String] = [
 	# Rivers
 	"river_end",
@@ -37,8 +39,8 @@ const _VARIANT_SUFFIXES: Array[String] = [
 	"road_6",
 ]
 
-# Biomes you actually use. Add more here later (e.g. "sand", "forest").
 const _BIOMES: Array[String] = ["base_cell"]
+
 
 func _populate_cell_dictionary_keys() -> void:
 	# Always-present base keys.
@@ -51,6 +53,8 @@ func _populate_cell_dictionary_keys() -> void:
 			var key := "%s_%s" % [biome, suffix]
 			if not cell_dictionary.has(key):
 				cell_dictionary[key] = null
+
+
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		_ensure_dictionary_keys()
@@ -76,7 +80,9 @@ func _ensure_dictionary_keys() -> void:
 	if changed:
 		notify_property_list_changed()
 
+
 func get_manager_name() -> String: return "HexGrid"
+
 
 func _setup():
 	chunk_count_x = ceili(float(width) / chunk_size)
@@ -84,6 +90,7 @@ func _setup():
 
 	cells.resize(width * height)
 	chunks.resize(chunk_count_x * chunk_count_z)
+
 
 func _execute():
 	_setup_ground_collider()
@@ -107,6 +114,7 @@ func _create_chunks() -> void:
 			chunks[z * chunk_count_x + x] = chunk
 			add_child(chunk)
 
+
 func _create_cells() -> void:
 	var i: int = 0
 	for z in range(height):
@@ -114,6 +122,7 @@ func _create_cells() -> void:
 			create_cell(x, z, i)
 			
 			i += 1
+
 
 func create_cell(x: int, z: int, i: int) -> void:
 	var pos: Vector3
@@ -145,9 +154,11 @@ func create_cell(x: int, z: int, i: int) -> void:
 	cell.setup(x, z, pos, 0)
 	cells[i] = cell
 
+
 func _build_chunks() -> void:
 	for chunk in chunks:
 		chunk.build()
+
 
 func _setup_ground_collider() -> void:
 	ground_body = StaticBody3D.new()
@@ -158,6 +169,7 @@ func _setup_ground_collider() -> void:
 	ground_body.add_child(col)
 	add_child(ground_body)
 
+
 func get_cell_from_position(world_pos: Vector3) -> HexCell:
 	var coords := HexGrid.from_position(world_pos)
 	var offset_x := coords.x + coords.z / 2
@@ -165,6 +177,7 @@ func get_cell_from_position(world_pos: Vector3) -> HexCell:
 	if index >= 0 and index < cells.size():
 		return cells[index]
 	return null
+
 
 static func from_position(pos: Vector3) -> HexCoordinates:
 	var x: float = pos.x / (HexMetrics.inner_radius * 2.0)
@@ -189,10 +202,31 @@ static func from_position(pos: Vector3) -> HexCoordinates:
 	return HexCoordinates.new(iX, iZ)
 
 
-func find_path(from_cell: HexCell, to_cell: HexCell, speed: int) -> void:
+func find_path(from_cell: HexCell, to_cell: HexCell, speed: int) -> Array[HexCell]:
+	var path: Array[HexCell] = []
+	
+	# 1. Run the search logic to populate 'path_from' and 'distance'
 	search(from_cell, to_cell, speed)
+	
+	# 2. Check if a path actually exists (distance -1 means unreachable)
+	if to_cell == null or to_cell.distance == -1:
+		return path
+	
+	# 3. Trace back from the target to the start
+	var current := to_cell
+	while current != null:
+		path.append(current)
+		if current == from_cell:
+			break
+		current = current.path_from
+	
+	# 4. Reverse the array so it goes from [Start ... End]
+	path.reverse()
+	
+	return path
 
 func search(from_cell: HexCell, to_cell: HexCell, speed: int) -> void:
+	# Clear previous search data
 	for i in range(cells.size()):
 		cells[i].distance = -1
 		cells[i].path_from = null
@@ -205,6 +239,8 @@ func search(from_cell: HexCell, to_cell: HexCell, speed: int) -> void:
 	while not frontier.is_empty():
 		var current: HexCell = frontier.dequeue()
 		if current == null: break
+		
+		# If we found our target, we can stop searching early
 		if current == to_cell: break
 
 		for dir in range(6):
@@ -214,23 +250,18 @@ func search(from_cell: HexCell, to_cell: HexCell, speed: int) -> void:
 			var edge_type := current.get_edge_type_other_cell(neighbor)
 			if edge_type == Enums.HexEdgeType.Cliff: continue
 
-			# Calculate base movement cost
+			# Calculate move cost
 			var move_cost: int
 			if current.has_road_through_edge(dir):
 				move_cost = 1
 			else:
-				# Use plant_level as a penalty (as seen in Part 9)
 				move_cost = 5 if edge_type == Enums.HexEdgeType.Flat else 10
 				move_cost += neighbor.plant_level * 2 
 			
-			# PART 17 TURN LOGIC:
-			# Calculate which turn this move would end on
 			var distance: int = current.distance + move_cost
 			var turn := (distance - 1) / speed
 			var current_turn := (current.distance - 1) / speed
 			
-			# If we cross a turn boundary, we "waste" the remaining points 
-			# of the previous turn and start the new turn with the full move cost.
 			if turn > current_turn:
 				distance = turn * speed + move_cost
 
@@ -239,19 +270,20 @@ func search(from_cell: HexCell, to_cell: HexCell, speed: int) -> void:
 				neighbor.path_from = current
 				frontier.enqueue(neighbor, distance)
 
+	# Keep the visual highlighting if desired
 	_highlight_path(from_cell, to_cell, speed)
 
 func _highlight_path(from_cell: HexCell, to_cell: HexCell, speed: int):
-	from_cell.enable_highlight(Color.BLUE)
+	from_cell.enable_highlight(self, Color.BLUE)
 	if to_cell and to_cell.distance != -1:
-		to_cell.enable_highlight(Color.RED)
+		to_cell.enable_highlight(self, Color.RED)
 		var current := to_cell.path_from
 		while current != null and current != from_cell:
 			# Blue for reachable this turn, White for later turns
 			if current.distance <= speed:
-				current.enable_highlight(Color.CYAN)
+				current.enable_highlight(self, Color.CYAN)
 			else:
-				current.enable_highlight(Color.WHITE)
+				current.enable_highlight(self, Color.WHITE)
 			current = current.path_from
 
 
@@ -264,9 +296,9 @@ func show_range(from_cell: HexCell, speed: int, max_turns: int = 1):
 	for cell in cells:
 		if cell.distance != -1 and cell.distance <= max_distance:
 			if cell.distance <= speed:
-				cell.enable_highlight(Color.BLUE) # Turn 1
+				cell.enable_highlight(self, Color.BLUE) # Turn 1
 			else:
-				cell.enable_highlight(Color.SLATE_BLUE) # Turn 2+
+				cell.enable_highlight(self, Color.SLATE_BLUE) # Turn 2+
 		else:
 			cell.disable_highlight()
 
@@ -293,3 +325,58 @@ func get_random_cell(only_walkable: bool = false) -> HexCell:
 		return null
 		
 	return walkable_cells.pick_random()
+
+
+func get_cells_in_radius(starting_cell: HexCell, radius: int, only_walkable: bool) -> Array[HexCell]:
+	var results: Array[HexCell] = []
+	if not starting_cell:
+		return results
+
+	var center_coords = starting_cell.coordinates
+
+	# Iterate through the cube coordinate range
+	for x in range(-radius, radius + 1):
+		# The range of z is constrained by the fact that x + y + z = 0
+		# and all coordinates must be within the radius
+		var z_min = max(-radius, -x - radius)
+		var z_max = min(radius, -x + radius)
+		
+		for z in range(z_min, z_max + 1):
+			var target_x = center_coords.x + x
+			var target_z = center_coords.z + z
+			
+			# Convert cube coordinates back to the grid index
+			var cell = get_cell_by_cube_coords(target_x, target_z)
+			
+			if cell:
+				if only_walkable and cell.is_underwater:
+					continue
+				results.append(cell)
+				
+	return results
+
+
+func get_cell_by_cube_coords(x: int, z: int) -> HexCell:
+	var offset_x := x + z / 2
+	var offset_z := z
+	
+	# Bounds check
+	if offset_x < 0 or offset_x >= width or offset_z < 0 or offset_z >= height:
+		return null
+		
+	var index := offset_x + offset_z * width
+	if index >= 0 and index < cells.size():
+		return cells[index]
+	return null
+
+
+func clear_highlighted_cells():
+	for cell in highlighted_cells:
+		cell.disable_highlight()
+
+func highlight_cells(cells_array : Array[HexCell], color : Color, clear_previously_highlighted : bool):
+	if clear_previously_highlighted:
+		clear_highlighted_cells()
+	
+	for cell in cells_array:
+		cell.enable_highlight(self, color)

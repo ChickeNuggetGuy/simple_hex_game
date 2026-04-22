@@ -26,11 +26,18 @@ func _setup():
 		target_follow_offset = main_phantom_camera.follow_offset
 
 func _execute():
-	var input_manager : InputManager = GameManager.get_manager("InputManager")
-	if input_manager and not input_manager.selected_unit_changed.is_connected(selected_unit_changed):
-		input_manager.selected_unit_changed.connect(selected_unit_changed)
+	var unit_manager : UnitManager = GameManager.get_manager("UnitManager")
+	if unit_manager and not unit_manager.selected_unit_changed.is_connected(selected_unit_changed):
+		unit_manager.selected_unit_changed.connect(selected_unit_changed)
 		
 
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.is_pressed():
+		if event.keycode == Key.KEY_F:
+			var unit_manager : UnitManager = GameManager.get_manager("UnitManager")
+			if unit_manager and unit_manager.get_selected_unit():
+				focus_hex_object(unit_manager.get_selected_unit())
 
 func _physics_process(delta: float) -> void:
 	_transposer_movement(delta)
@@ -90,6 +97,6 @@ func focus_hex_object(object : HexObject):
 	transposer.position = object.hex_cell.world_position
 
 
-func selected_unit_changed(unit : Unit):
+func selected_unit_changed(unit : Unit, old_unit : Unit ):
 	if unit:
 		focus_hex_object(unit)

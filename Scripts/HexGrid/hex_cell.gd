@@ -147,7 +147,9 @@ var current_hex_objects : Array[HexObject] = []
 
 func setup(x: int, z: int, world_pos: Vector3, elev: int, walkable: bool = true) -> void:
 	world_position = world_pos
-	coordinates = HexCoordinates.new(x, z)
+	var cube_x = x - ((z - (z & 1)) / 2)
+	coordinates = HexCoordinates.new(cube_x, z)
+	
 	name = "Hex Cell (%d,%d)" % [x, z]
 	_walkable = walkable
 	
@@ -203,10 +205,12 @@ func disable_highlight():
 		hex_highlight.hide()
 
 
-func enable_highlight(color : Color = Color.WHITE):
+func enable_highlight(hex_grid : HexGrid, color : Color = Color.WHITE):
 	if hex_highlight:
 		hex_highlight.modulate = color
 		hex_highlight.show()
+		
+		hex_grid.highlighted_cells.append(self)
 #endregion
 
 #region River Functions
