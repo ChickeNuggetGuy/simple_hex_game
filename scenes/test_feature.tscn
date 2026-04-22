@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://drft448deex5x"]
+
+[ext_resource type="PackedScene" uid="uid://c3c2iugq6qf12" path="res://Third Party Assets/Medival Hex/gltf/buildings/neutral/building_stage_A.gltf" id="1_14hhn"]
+
+[node name="Node3D" type="Node3D" unique_id=650746256]
+
+[node name="building_stage_A2" parent="." unique_id=752457019 instance=ExtResource("1_14hhn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5746262, 0)
